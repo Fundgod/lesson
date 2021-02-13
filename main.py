@@ -195,7 +195,7 @@ class App:
                 toponym = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
                 coords = make_coords(toponym["Point"]["pos"])
                 self.focus = coords
-                self.labels.append(coords)
+                self.labels.append(coords.copy())
                 self.update()
             except IndexError:  # если ничего не нашлось
                 return
@@ -211,14 +211,17 @@ class App:
             return
 
     def _change_focus(self, key):
+        step = [0, 0]
         if key == pygame.K_UP:
-            self.focus[1] += self.move_speed * self.spn
+            step[1] = self.move_speed * self.spn
         elif key == pygame.K_DOWN:
-            self.focus[1] -= self.move_speed * self.spn
+            step[1] = -self.move_speed * self.spn
         elif key == pygame.K_LEFT:
-            self.focus[0] -= self.move_speed * self.spn
+            step[0] = -self.move_speed * self.spn
         elif key == pygame.K_RIGHT:
-            self.focus[0] += self.move_speed * self.spn
+            step[0] = self.move_speed * self.spn
+        self.focus[0] += step[0]
+        self.focus[1] += step[1]
         self.update()
 
     def _click_buttons(self, mouse_pos):
