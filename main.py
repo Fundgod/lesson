@@ -158,7 +158,6 @@ class App:
         self.spn = 0.001
         self.focus = [37.53, 55.7]
         self.view_mode = "map"
-        self.labels = []
         self.map = self._load_map()
         self.mode_switch = MapModeSwitch(0, 5, 100, 40)
         self.search_field = InputField(105, 5, 350, 40)
@@ -167,20 +166,20 @@ class App:
         self.search_btn = Button(505, 5, 90, 40, "Искать", command=self._search_object_by_address)
         self.move_speed = 0.1
 
-    def _load_map(self):
+    def _load_map(self, labels=()):
         params = {
             "ll": format_coords(*self.focus),
             "spn": format_coords(self.spn, self.spn),
             "l": self.view_mode,
-            "pt": '~'.join(format_coords(*label) + ",pm2dgl" for label in self.labels)
+            "pt": '~'.join(format_coords(*label) + ",pm2dgl" for label in labels)
         }
         response = requests.get(MAP_API_SERVER, params=params)
         with open("map.png", "wb") as f:
             f.write(response.content)
         return pygame.transform.scale(pygame.image.load("map.png"), SIZE)
 
-    def update(self):
-        self.map = self._load_map()
+    def update(self, labels=()):
+        self.map = self._load_map(labels)
 
     def _search_object_by_address(self):
         address = self.search_field.get_text()
@@ -195,8 +194,7 @@ class App:
                 toponym = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
                 coords = make_coords(toponym["Point"]["pos"])
                 self.focus = coords
-                self.labels.append(coords.copy())
-                self.update()
+                self.update([coords])
             except IndexError:  # если ничего не нашлось
                 return
 
