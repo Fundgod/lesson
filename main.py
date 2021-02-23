@@ -1,6 +1,7 @@
 import pygame
 import requests
 import pyperclip
+import os
 from threading import Thread
 
 GEOCODER_API_SERVER = "http://geocode-maps.yandex.ru/1.x/"
@@ -158,28 +159,32 @@ class App:
         self.spn = 0.001
         self.focus = [37.53, 55.7]
         self.view_mode = "map"
+        self.labels = []
         self.map = self._load_map()
-        self.mode_switch = MapModeSwitch(0, 5, 100, 40)
-        self.search_field = InputField(105, 5, 350, 40)
+        self.mode_switch = MapModeSwitch(0, 5, 60, 40)
+        self.search_field = InputField(65, 5, 350, 40)
         self.search_field.activate()
-        self.clear_search_field_btn = Button(460, 5, 40, 40, 'C', command=self.search_field.clear)
-        self.search_btn = Button(505, 5, 90, 40, "Искать", command=self._search_object_by_address)
+        self.clear_search_field_btn = Button(420, 5, 40, 40, 'C', command=self.search_field.clear)
+        self.search_btn = Button(465, 5, 90, 40, "Искать", command=self._search_object_by_address)
+        self.remove_label_btn = Button(560, 5, 35, 40, "×", command=self._remove_label)
         self.move_speed = 0.1
 
-    def _load_map(self, labels=()):
+    def _load_map(self):
         params = {
             "ll": format_coords(*self.focus),
             "spn": format_coords(self.spn, self.spn),
             "l": self.view_mode,
-            "pt": '~'.join(format_coords(*label) + ",pm2dgl" for label in labels)
+            "pt": '~'.join(format_coords(*label) + ",pm2dgl" for label in self.labels)
         }
         response = requests.get(MAP_API_SERVER, params=params)
         with open("map.png", "wb") as f:
             f.write(response.content)
-        return pygame.transform.scale(pygame.image.load("map.png"), SIZE)
+        image = pygame.image.load("map.png")
+        Thread(target=os.remove, args=("map.png",)).start()
+        return image
 
-    def update(self, labels=()):
-        self.map = self._load_map(labels)
+    def update(self):
+        self.map = self._load_map()
 
     def _search_object_by_address(self):
         address = self.search_field.get_text()
@@ -194,7 +199,8 @@ class App:
                 toponym = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
                 coords = make_coords(toponym["Point"]["pos"])
                 self.focus = coords
-                self.update([coords])
+                self.labels.append(coords.copy())
+                self.update()
             except IndexError:  # если ничего не нашлось
                 return
 
@@ -222,6 +228,10 @@ class App:
         self.focus[1] += step[1]
         self.update()
 
+    def _remove_label(self):
+        self.labels.clear()
+        self.update()
+
     def _click_buttons(self, mouse_pos):
         click_rect = pygame.Rect(*mouse_pos, 1, 1)
         if click_rect.colliderect(self.search_field):
@@ -238,6 +248,8 @@ class App:
             self.clear_search_field_btn.click()
         if click_rect.colliderect(self.search_btn.rect):
             self.search_btn.click()
+        if click_rect.colliderect(self.remove_label_btn.rect):
+            self.remove_label_btn.click()
 
     def on_click(self, mouse_pos):
         self._click_buttons(mouse_pos)
@@ -259,6 +271,7 @@ class App:
         self.search_field.render(surface)
         self.clear_search_field_btn.render(surface)
         self.search_btn.render(surface)
+        self.remove_label_btn.render((surface))
 
     def render(self, surface):
         self.render_buttons(surface)
