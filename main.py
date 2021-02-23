@@ -11,7 +11,7 @@ GEOCODER_PARAMS = {
 MAP_API_SERVER = "http://static-maps.yandex.ru/1.x/"
 FPS = 60
 BLACK = (0, 0, 0)
-SIZE = (600, 500)
+SIZE = (600, 550)
 ARROW_BUTTONS = {pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT}
 
 
@@ -23,20 +23,15 @@ def make_coords(coords):
     return list(map(float, coords.split()))
 
 
-class Button:
-    def __init__(self, x, y, width, height, text, command=None):
+class TextLabel:
+    def __init__(self, x, y, width, height, text=''):
         self.x = x
         self.y = y
         self.width = width
         self.height = height
-        if command is not None:
-            self.command = command
-        else:
-            self.command = lambda: None
-        self.rect = pygame.Rect(x, y, width, height)
         self._init_ui()
         self.font = pygame.font.SysFont("Calibri", 30)
-        self._set_text(text)
+        self.set_text(text)
 
     def _init_ui(self):
         self.image = pygame.Surface((self.width, self.height))
@@ -45,16 +40,27 @@ class Button:
         subimage.fill((255, 255, 255, 100))
         self.image.blit(subimage, (2, 2))
 
-    def _set_text(self, text):
+    def set_text(self, text):
         self.text = self.font.render(text, True, (0, 255, 0))
         self.text_pos = (self.x + (self.width - self.text.get_width()) / 2, self.y + 5)
-
-    def click(self):
-        self.command()
 
     def render(self, surface):
         surface.blit(self.image, (self.x, self.y))
         surface.blit(self.text, self.text_pos)
+
+
+class Button(TextLabel):
+    def __init__(self, x, y, width, height, text, command=None):
+        super().__init__(x, y, width, height, text)
+        if command is not None:
+            self.command = command
+        else:
+            self.command = lambda: None
+        self.rect = pygame.Rect(x, y, width, height)
+        self.font = pygame.font.SysFont("Calibri", 30)
+
+    def click(self):
+        self.command()
 
 
 class MapModeSwitch(Button):
@@ -69,7 +75,7 @@ class MapModeSwitch(Button):
         if self.map_view_mode == len(self.map_view_modes):
             self.map_view_mode = 0
         view_mode = self.map_view_modes[self.map_view_mode]
-        self._set_text(view_mode)
+        self.set_text(view_mode)
         return view_mode
 
 
@@ -161,12 +167,13 @@ class App:
         self.view_mode = "map"
         self.labels = []
         self.map = self._load_map()
-        self.mode_switch = MapModeSwitch(0, 5, 60, 40)
-        self.search_field = InputField(65, 5, 350, 40)
+        self.address_label = TextLabel(0, 5, 600, 45)
+        self.mode_switch = MapModeSwitch(0, 55, 60, 40)
+        self.search_field = InputField(65, 55, 350, 40)
         self.search_field.activate()
-        self.clear_search_field_btn = Button(420, 5, 40, 40, 'C', command=self.search_field.clear)
-        self.search_btn = Button(465, 5, 90, 40, "Искать", command=self._search_object_by_address)
-        self.remove_label_btn = Button(560, 5, 35, 40, "×", command=self._remove_label)
+        self.clear_search_field_btn = Button(420, 55, 40, 40, 'C', command=self.search_field.clear)
+        self.search_btn = Button(465, 55, 90, 40, "Искать", command=self._search_object_by_name)
+        self.remove_label_btn = Button(560, 55, 35, 40, "×", command=self._remove_label)
         self.move_speed = 0.1
 
     def _load_map(self):
@@ -186,7 +193,7 @@ class App:
     def update(self):
         self.map = self._load_map()
 
-    def _search_object_by_address(self):
+    def _search_object_by_name(self):
         address = self.search_field.get_text()
         request_params = {
             "apikey": self._apikey,
@@ -200,6 +207,7 @@ class App:
                 coords = make_coords(toponym["Point"]["pos"])
                 self.focus = coords
                 self.labels.append(coords.copy())
+                self.address_label.set_text(toponym["metaDataProperty"]["GeocoderMetaData"]["Address"]["formatted"])
                 self.update()
             except IndexError:  # если ничего не нашлось
                 return
@@ -230,6 +238,7 @@ class App:
 
     def _remove_label(self):
         self.labels.clear()
+        self.address_label.set_text('')
         self.update()
 
     def _click_buttons(self, mouse_pos):
@@ -264,9 +273,10 @@ class App:
             self._change_focus(key)
         elif self.search_field.input_active:
             if self.search_field.input(event):
-                self._search_object_by_address()
+                self._search_object_by_name()
 
-    def render_buttons(self, surface):
+    def _render_ui(self, surface):
+        self.address_label.render(surface)
         self.mode_switch.render(surface)
         self.search_field.render(surface)
         self.clear_search_field_btn.render(surface)
@@ -274,8 +284,8 @@ class App:
         self.remove_label_btn.render((surface))
 
     def render(self, surface):
-        self.render_buttons(surface)
-        surface.blit(self.map, (0, 50))
+        self._render_ui(surface)
+        surface.blit(self.map, (0, 100))
 
 
 def main():
